@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<layers>
+  <layer
+      name="brainelechateau.urban.dataimport"
+      interface="brainelechateau.urban.dataimport.interfaces.IBrainelechateauUrbanDataimportLayer"
+  />
+</layers>

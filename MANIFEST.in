@@ -1,0 +1,4 @@
+include *.cfg *.rst *.in
+graft src/brainelechateau/urban
+graft docs
+global-exclude *pyc

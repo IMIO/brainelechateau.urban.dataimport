@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<import-steps>
+
+ <import-step
+    id="brainelechateau.urban.dataimport-brainelechateauUrbawebImport"
+    handler="brainelechateau.urban.dataimport.importer.importBrainelechateauUrbaweb"
+    title="Urbaweb import for Brainelechateau">
+  Urbaweb import for Brainelechateau
+ </import-step>
+
+</import-steps>
