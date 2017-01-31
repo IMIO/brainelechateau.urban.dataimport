@@ -1,0 +1,29 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:five="http://namespaces.zope.org/five"
+    i18n_domain="brainelechateau.urban.dataimport">
+
+
+    <adapter
+        for="imio.urban.dataimport.interfaces.IImportSettingsForm"
+        factory=".settings.BrainelechateauCsvImporterFromImportSettings"
+        provides="imio.urban.dataimport.csv.interfaces.ICSVImporter"
+        name="brainelechateau csv licences"
+    />
+
+    <adapter
+        for="imio.urban.dataimport.csv.interfaces.ICSVImporter"
+        factory=".importer.BrainelechateauCSVMapping"
+        provides="imio.urban.dataimport.interfaces.IObjectsMapping"
+        name="objects mapping"
+    />
+
+    <adapter
+        for="imio.urban.dataimport.csv.interfaces.ICSVImporter"
+        factory=".importer.BrainelechateauCSVValuesMapping"
+        provides="imio.urban.dataimport.interfaces.IValuesMapping"
+        name="values mapping"
+    />
+
+
+</configure>
