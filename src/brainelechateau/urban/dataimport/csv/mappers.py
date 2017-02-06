@@ -3,6 +3,8 @@ import unicodedata
 
 import datetime
 
+from brainelechateau.urban.dataimport.csv.utils import get_state_from_licences_dates, get_date_from_licences_dates, \
+    load_architects, load_geometers, load_notaries, load_parcellings
 from imio.urban.dataimport.config import IMPORT_FOLDER_PATH
 
 from imio.urban.dataimport.exceptions import NoObjectToCreateException
@@ -42,6 +44,14 @@ class LicenceFactory(BaseFactory):
 
 
 class IdMapper(Mapper):
+
+    def __init__(self, importer, args):
+        super(IdMapper, self).__init__(importer, args)
+        load_architects()
+        load_geometers()
+        load_notaries()
+        load_parcellings()
+
     def mapId(self, line):
         return normalizeString(self.getData('id'))
 
@@ -65,21 +75,25 @@ class LicenceSubjectMapper(Mapper):
 
 class WorklocationMapper(Mapper):
     def mapWorklocations(self, line):
-        num = self.getData('num')
+        num = self.getData('AdresseTravauxNumero')
         noisy_words = set(('d', 'du', 'de', 'des', 'le', 'la', 'les', 'à', ',', 'rues', 'terrain', 'terrains', 'garage', 'magasin', 'entrepôt'))
-        raw_street = self.getData('Adresse')
+        raw_street = self.getData('AdresseTravauxRue')
         if raw_street.endswith(')'):
             raw_street = raw_street[:-5]
         street = cleanAndSplitWord(raw_street)
         street_keywords = [word for word in street if word not in noisy_words and len(word) > 1]
         if len(street_keywords) and street_keywords[-1] == 'or':
             street_keywords = street_keywords[:-1]
+
+        locality = self.getData('AdresseTravauxVille')
+        street_keywords.extend(cleanAndSplitWord(locality))
+
         brains = self.catalog(portal_type='Street', Title=street_keywords)
         if len(brains) == 1:
             return ({'street': brains[0].UID, 'number': num},)
         if street:
             self.logError(self, line, 'Couldnt find street or found too much streets', {
-                'address': '%s, %s' % (num, raw_street),
+                'address': '%s, %s, $s ' % (num, raw_street, locality),
                 'street': street_keywords,
                 'search result': len(brains)
             })
@@ -94,17 +108,21 @@ class WorkTypeMapper(Mapper):
 
 class InquiryStartDateMapper(Mapper):
     def mapInvestigationstart(self, line):
-        date = self.getData('E_Datdeb')
+        date = self.getData('DateDebEnq')
         date = date and DateTime(date) or None
         return date
 
 
 class InquiryEndDateMapper(Mapper):
     def mapInvestigationend(self, line):
-        date = self.getData('E_Datfin')
+        date = self.getData('DateFinEnq')
         date = date and DateTime(date) or None
         return date
 
+class InvestigationReasonsMapper(Mapper):
+    def mapInvestigationreasons(self, line):
+        reasons = '<p>%s</p> <p>%s</p>' % (self.getData('ParticularitesEnq1'), self.getData('ParticularitesEnq2'))
+        return reasons
 
 class InquiryReclamationNumbersMapper(Mapper):
     def mapInvestigationwritereclamationnumber(self, line):
@@ -144,16 +162,19 @@ class InquiryArticlesMapper(PostCreationMapper):
 class AskOpinionsMapper(Mapper):
     def mapSolicitopinionsto(self, line):
         ask_opinions = []
-        for i in range(1, 11):
-            opinionmakers = self.getData('Org{}'.format(i), line)
-            if opinionmakers:
-                ask_opinions.append(opinionmakers)
+        for i in range(60, 76):
+            j = i - 59
+            if line[i] == "VRAI":
+                solicitOpinionDictionary = self.getValueMapping('solicitOpinionDictionary')
+                opinion = solicitOpinionDictionary[str(j)]
+                if opinion:
+                    ask_opinions.append(opinion)
         return ask_opinions
 
 
 class ObservationsMapper(Mapper):
     def mapDescription(self, line):
-        description = '<p>%s</p>' % self.getData('Memo_Urba')
+        description = '<p>%s</p> <p>%s</p>' % (self.getData('ParticularitesEnq1'),self.getData('ParticularitesEnq2'))
         return description
 
 
@@ -166,7 +187,7 @@ class TechnicalConditionsMapper(Mapper):
 
 class ArchitectMapper(PostCreationMapper):
     def mapArchitects(self, line, plone_object):
-        archi_name = self.getData('Architecte')
+        archi_name = '%s %s %s' % (self.getData('Nom Architecte'), self.getData('Prenom Architecte'), self.getData('Societe Architecte'))
         fullname = cleanAndSplitWord(archi_name)
         if not fullname:
             return []
@@ -185,6 +206,23 @@ class ArchitectMapper(PostCreationMapper):
                           'search_result': len(architects)
                       })
         return []
+
+
+class FolderZoneTableMapper(Mapper):
+    def mapFolderzone(self, line):
+        folderZone = []
+        sectorMap1 = self.getData('Plan de Secteur 1')
+        sectorMap2 = self.getData('Plan de Secteur 2')
+
+        zoneDictionnary = self.getValueMapping('zoneDictionary')
+
+        if sectorMap1 in zoneDictionnary:
+            folderZone.append(zoneDictionnary[sectorMap1])
+
+        if sectorMap2 in zoneDictionnary:
+            folderZone.append(zoneDictionnary[sectorMap2])
+
+        return folderZone
 
 
 class GeometricianMapper(PostCreationMapper):
@@ -243,23 +281,11 @@ class EnvRubricsMapper(Mapper):
 class CompletionStateMapper(PostCreationMapper):
     def map(self, line, plone_object):
         self.line = line
-        transition = ''
-        date = self.getData('date permis')
-        try:
-            datetime.datetime.strptime(date, "%d/%m/%Y")
-            transition = 'accept'
-        except ValueError:
-            try:
-                datetime.datetime.strptime(date, "%d/%m/%y")
-                transition = 'accept'
-            except ValueError:
-                pass
-
-        if transition != 'accept':
-            if date == 'ABANDON':
-                transition = 'retire'
-            else:
-                transition = 'refuse'
+        datePermis = self.getData('Date Permis')
+        dateRefus = self.getData('Date Refus')
+        datePermisRecours = self.getData('Date Permis sur recours')
+        dateRefusRecours = self.getData('Date Refus sur recours')
+        transition = get_state_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
 
         if transition:
             api.content.transition(plone_object, transition)
@@ -311,7 +337,7 @@ class ContactFactory(BaseFactory):
 
 class ContactIdMapper(Mapper):
     def mapId(self, line):
-        name = '%s%s' % (self.getData('Nom'), self.getData('ref'))
+        name = '%s%s%s' % (self.getData('NomDemandeur1'), self.getData('PrenomDemandeur1'), self.getData('id'))
         name = name.replace(' ', '').replace('-', '')
         return normalizeString(self.site.portal_urban.generateUniqueId(name))
 
@@ -436,15 +462,15 @@ class ParcelFactory(BaseFactory):
 
 class ParcelDataMapper(Mapper):
     def map(self, line, **kwargs):
-        section = self.getData('Sect', line).upper()
-        division_map = self.getValueMapping('division_map')
-        division = division_map.get((self.getData('Div', line)).strip())
-        remaining_reference = self.getData('num parcelle', line)
+        section = self.getData('Parcelle1section', line).upper()
+        if len(section) > 0:
+            section = section[0]
+        remaining_reference = '%s %s' % (self.getData('Parcelle1numero', line), self.getData('Parcelle1numerosuite', line))
         if not remaining_reference:
             return []
-
         abbreviations = identify_parcel_abbreviations(remaining_reference)
-        if not division or not section or division == 'NA' or section == 'NA':
+        division = '2ème division' if self.getData('AdresseTravauxVille', line) == u'Wauthier-Braine' else '1ère division'
+        if not remaining_reference or not section:
             return []
         base_reference = parse_cadastral_reference(division + section + abbreviations[0])
 
@@ -454,6 +480,25 @@ class ParcelDataMapper(Mapper):
         for abbreviation in abbreviations[1:]:
             new_parcel = guess_cadastral_reference(base_reference, abbreviation)
             parcels.append(new_parcel)
+
+
+        section2 = self.getData('Parcelle2section', line).upper()
+        if section2 :
+            section2 = section2[0]
+            remaining_reference2 = '%s %s' % (self.getData('Parcelle2numero', line), self.getData('Parcelle2numerosuite', line))
+            if not remaining_reference2:
+                return []
+
+            abbreviations2 = identify_parcel_abbreviations(remaining_reference2)
+            if not remaining_reference2 or not section2:
+                return []
+            base_reference2 = parse_cadastral_reference(division + section2 + abbreviations2[0])
+
+            base_reference2 = CadastralReference(*base_reference2)
+
+            for abbreviation2 in abbreviations2[1:]:
+                new_parcel2 = guess_cadastral_reference(base_reference2, abbreviation2)
+                parcels.append(new_parcel2)
 
         return parcels
 
@@ -680,7 +725,11 @@ class DecisionEventIdMapper(Mapper):
 
 class DecisionEventDateMapper(Mapper):
     def mapDecisiondate(self, line):
-        date = self.getData('date permis')
+        datePermis = self.getData('Date Permis')
+        dateRefus = self.getData('Date Refus')
+        datePermisRecours = self.getData('Date Permis sur recours')
+        dateRefusRecours = self.getData('Date Refus sur recours')
+        date = get_date_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
         if not date:
             self.logError(self, line, 'No decision date found')
             raise NoObjectToCreateException
@@ -689,18 +738,17 @@ class DecisionEventDateMapper(Mapper):
 
 class DecisionEventDecisionMapper(Mapper):
     def mapDecision(self, line):
-        date = self.getData('date permis')
-        if not date:
+        datePermis = self.getData('Date Permis')
+        dateRefus = self.getData('Date Refus')
+        datePermisRecours = self.getData('Date Permis sur recours')
+        dateRefusRecours = self.getData('Date Refus sur recours')
+        state = get_state_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
+
+        if state == 'accept':
+            return u'Favorable'
+        elif state == 'refuse':
             return u'Défavorable'
-        try:
-            datetime.datetime.strptime(date, "%d/%m/%y")
-            return 'Favorable'
-        except ValueError:
-            try:
-                datetime.datetime.strptime(date, "%d/%m/%Y")
-                return 'Favorable'
-            except ValueError:
-                return u'Défavorable'
+
 
 
 class DecisionEventTitleMapper(Mapper):
@@ -721,11 +769,40 @@ class DecisionEventTitleMapper(Mapper):
 
 class DecisionEventNotificationDateMapper(Mapper):
     def mapEventdate(self, line):
-        eventDate = self.getData('date permis')
+        datePermis = self.getData('Date Permis')
+        dateRefus = self.getData('Date Refus')
+        datePermisRecours = self.getData('Date Permis sur recours')
+        dateRefusRecours = self.getData('Date Refus sur recours')
+        eventDate = get_date_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
         if eventDate:
             return eventDate
         else:
             raise NoObjectToCreateException
+
+
+class CollegeReportTypeMapper(Mapper):
+    def mapEventtype(self, line):
+        licence = self.importer.current_containers_stack[-1]
+        urban_tool = api.portal.get_tool('portal_urban')
+        eventtype_id = self.getValueMapping('eventtype_id_map')[licence.portal_type]['college_report_event']
+        config = urban_tool.getUrbanConfig(licence)
+        return getattr(config.urbaneventtypes, eventtype_id).UID()
+
+
+class CollegeReportIdMapper(Mapper):
+    def mapId(self, line):
+        return 'college_report_event'
+
+
+class CollegeReportEventDateMapper(Mapper):
+    def mapEventdate(self, line):
+        eventDate = self.getData('Rapport du College')
+        if eventDate:
+            return eventDate
+        else:
+            raise NoObjectToCreateException
+
+
 
 #
 # UrbanEvent suspension

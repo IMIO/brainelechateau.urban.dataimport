@@ -24,8 +24,8 @@ class BrainelechateauCsvImporterFromImportSettings(CSVImporterFromImportSettings
         """
         settings = super(BrainelechateauCsvImporterFromImportSettings, self).get_importer_settings()
         db_settings = {
-            'key_column': 'ref',
-            'csv_filename': 'brainelechateau.csv',
+            'key_column': 'id',
+            'csv_filename': 'brainelechateau_new.csv',
         }
 
         settings.update(db_settings)

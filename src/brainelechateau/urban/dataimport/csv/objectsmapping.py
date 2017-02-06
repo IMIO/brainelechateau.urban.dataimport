@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from brainelechateau.urban.dataimport.csv.mappers import *
 from imio.urban.dataimport.mapper import SimpleMapper
 
@@ -8,6 +10,7 @@ OBJECTS_NESTING = [
             ('PARCEL', []),
             # ('DEPOSIT EVENT 1', []),
             ('DECISION EVENT', []),
+            ('COLLEGE REPORT EVENT', []),
             # ('DOCUMENTS', []),
         ],
     ),
@@ -21,8 +24,16 @@ FIELDS_MAPPINGS = {
         'mappers': {
             SimpleMapper: (
                 {
-                    'from': 'ref',
+                    'from': "Reference",
                     'to': 'referenceDGATLP',
+                },
+                {
+                    'from': 'Objet',
+                    'to': 'licenceSubject',
+                },
+                {
+                    'from': 'Delai annonce',
+                    'to': 'annoncedDelay',
                 },
             ),
 
@@ -36,21 +47,23 @@ FIELDS_MAPPINGS = {
                 'to': ('portal_type', 'folderCategory',)
             },
 
-            LicenceSubjectMapper: {
-                'from': ('Genre de Travaux', 'Divers'),
-                'to': 'licenceSubject',
-            },
-
             WorklocationMapper: {
-                'from': ('Adresse', 'num'),
+                'from': ('AdresseTravauxRue', 'AdresseTravauxNumero', 'AdresseTravauxBoite', 'AdresseTravauxVille'),
                 'to': 'workLocations',
             },
 
            ArchitectMapper: {
                'allowed_containers': ['BuildLicence'],
-               'from': ('Architecte',),
+               'from': ('Nom Architecte', 'Prenom Architecte', 'Societe Architecte'),
                'to': ('architects',)
            },
+
+            FolderZoneTableMapper: {
+               'from': ('Plan de Secteur 1', 'Plan de Secteur 2'),
+               'to': 'folderZone',
+           },
+
+
 
             # WorkTypeMapper: {
             #     'allowed_containers': ['BuildLicence', 'ParcelOutLicence'],
@@ -58,17 +71,29 @@ FIELDS_MAPPINGS = {
             #     'to': 'workType',
             # },
 
-            # InquiryStartDateMapper: {
-            #     'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'UrbanCertificateTwo'],
-            #     'from': 'E_Datdeb',
-            #     'to': 'investigationStart',
-            # },
-            #
-            # InquiryEndDateMapper: {
-            #     'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'UrbanCertificateTwo'],
-            #     'from': 'E_Datfin',
-            #     'to': 'investigationEnd',
-            # },
+            InquiryStartDateMapper: {
+                'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'UrbanCertificateTwo'],
+                'from': 'DateDebEnq',
+                'to': 'investigationStart',
+            },
+
+            InquiryEndDateMapper: {
+                'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'UrbanCertificateTwo'],
+                'from': 'DateFinEnq',
+                'to': 'investigationEnd',
+            },
+
+            InvestigationReasonsMapper: {
+                'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'UrbanCertificateTwo'],
+                'from': ('ParticularitesEnq1', 'ParticularitesEnq2'),
+                'to': 'investigationReasons',
+            },
+
+            AskOpinionsMapper: {
+                'from': (),
+                'to': 'solicitOpinionsTo',
+            },
+
             #
             # InquiryReclamationNumbersMapper: {
             #     'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'UrbanCertificateTwo'],
@@ -83,7 +108,7 @@ FIELDS_MAPPINGS = {
             # },
             #
             # ObservationsMapper: {
-            #     'from': 'Memo_Urba',
+            #     'from': ('ParticularitesEnq1', 'ParticularitesEnq2'),
             #     'to': 'description',
             # },
             #
@@ -149,7 +174,7 @@ FIELDS_MAPPINGS = {
             # },
             #
             CompletionStateMapper: {
-                'from': 'date permis',
+                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
                 'to': (),  # <- no field to fill, its the workflow state that has to be changed
             },
 
@@ -166,7 +191,7 @@ FIELDS_MAPPINGS = {
 
         'mappers': {
             ParcelDataMapper: {
-                'from': ('num parcelle', 'Sect', 'Div'),
+                'from': ('Parcelle1section', 'Parcelle1numero', 'Parcelle1numerosuite', 'Parcelle2section', 'Parcelle2numero', 'Parcelle2numerosuite', 'AdresseTravauxVille'),
                 'to': (),
             },
         },
@@ -179,21 +204,21 @@ FIELDS_MAPPINGS = {
         'mappers': {
             SimpleMapper: (
                 {
-                    'from': 'Nom',
+                    'from': 'NomDemandeur1',
                     'to': 'name1',
                 },
                 {
-                    'from': ('num'),
-                    'to': 'number',
+                    'from': 'PrenomDemandeur1',
+                    'to': 'name2',
                 },
                 {
-                    'from': ('Adresse'),
+                    'from': ('AdresseDemandeur1'),
                     'to': 'street',
                 },
             ),
 
             ContactIdMapper: {
-                'from': ('Nom', 'ref'),
+                'from': ('NomDemandeur1', 'PrenomDemandeur1', 'id'),
                 'to': 'id',
             },
         },
@@ -215,17 +240,39 @@ FIELDS_MAPPINGS = {
             },
 
             DecisionEventDateMapper: {
-                'from': 'date permis',
+                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
                 'to': 'decisionDate',
             },
 
             DecisionEventDecisionMapper: {
-                'from': 'date permis',
+                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
                 'to': 'decision',
             },
 
             DecisionEventNotificationDateMapper: {
-                'from': 'date permis',
+                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
+                'to': 'eventDate',
+            }
+        },
+    },
+
+    'COLLEGE REPORT EVENT':
+    {
+        'factory': [UrbanEventFactory],
+
+        'mappers': {
+            CollegeReportTypeMapper: {
+                'from': (),
+                'to': 'eventtype',
+            },
+
+            CollegeReportIdMapper: {
+                'from': (),
+                'to': 'id',
+            },
+
+            CollegeReportEventDateMapper: {
+                'from': ('Rapport du College'),
                 'to': 'eventDate',
             }
         },
