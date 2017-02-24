@@ -5,16 +5,16 @@ from imio.urban.dataimport.mapping import table
 VALUES_MAPS = {
 
     'eventtype_id_map': table({
-        'header'             : ['decision_event', 'college_report_event'],
-        'BuildLicence'       : ['delivrance-du-permis-octroi-ou-refus', 'rapport-du-college'],
-        'ParcelOutLicence'   : ['delivrance-du-permis-octroi-ou-refus', ''],
-        'Declaration'        : ['deliberation-college', ''],
-        'UrbanCertificateOne': ['octroi-cu1', ''],
-        'UrbanCertificateTwo': ['octroi-cu2', ''],
-        'MiscDemand'         : ['deliberation-college', ''],
-        'EnvClassOne'        : ['decision', ''],
-        'EnvClassTwo'        : ['desision', ''],
-        'EnvClassThree'      : ['acceptation-de-la-demande', ''],
+        'header'             : ['decision_event', 'college_report_event', 'deposit_event'],
+        'BuildLicence'       : ['delivrance-du-permis-octroi-ou-refus', 'rapport-du-college', 'depot-de-la-demande'],
+        'ParcelOutLicence'   : ['delivrance-du-permis-octroi-ou-refus', 'rapport-du-college', 'depot-de-la-demande'],
+        'Declaration'        : ['deliberation-college', 'rapport-du-college', 'depot-de-la-demande'],
+        'UrbanCertificateOne': ['octroi-cu1', 'rapport-du-college', 'depot-de-la-demande'],
+        'UrbanCertificateTwo': ['octroi-cu2', 'rapport-du-college', 'depot-de-la-demande'],
+        'MiscDemand'         : ['deliberation-college', 'rapport-du-college', 'depot-de-la-demande'],
+        'EnvClassOne'        : ['decision', 'rapport-du-college', 'depot-de-la-demande'],
+        'EnvClassTwo'        : ['desision', 'rapport-du-college', 'depot-de-la-demande'],
+        'EnvClassThree'      : ['acceptation-de-la-demande', 'rapport-du-college', 'depot-de-la-demande'],
     }),
 
     'solicitOpinionDictionary': {

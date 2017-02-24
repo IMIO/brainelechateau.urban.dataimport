@@ -8,7 +8,7 @@ OBJECTS_NESTING = [
         'LICENCE', [
             ('CONTACT', []),
             ('PARCEL', []),
-            # ('DEPOSIT EVENT 1', []),
+            ('DEPOSIT EVENT', []),
             ('DECISION EVENT', []),
             ('COLLEGE REPORT EVENT', []),
             # ('DOCUMENTS', []),
@@ -252,6 +252,28 @@ FIELDS_MAPPINGS = {
             DecisionEventNotificationDateMapper: {
                 'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
                 'to': 'eventDate',
+            }
+        },
+    },
+
+    'DEPOSIT EVENT':
+    {
+        'factory': [UrbanEventFactory],
+
+        'mappers': {
+            DepositEventMapper: {
+                'from': (),
+                'to': 'eventtype',
+            },
+
+            DepositDateMapper: {
+                'from': 'Recepisse',
+                'to': 'eventDate',
+            },
+
+            DepositEventIdMapper: {
+                'from': (),
+                'to': 'id',
             }
         },
     },

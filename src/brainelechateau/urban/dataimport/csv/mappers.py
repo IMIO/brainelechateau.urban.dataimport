@@ -93,7 +93,7 @@ class WorklocationMapper(Mapper):
             return ({'street': brains[0].UID, 'number': num},)
         if street:
             self.logError(self, line, 'Couldnt find street or found too much streets', {
-                'address': '%s, %s, $s ' % (num, raw_street, locality),
+                'address': '%s, %s, %s ' % (num, raw_street, locality),
                 'street': street_keywords,
                 'search result': len(brains)
             })
@@ -469,8 +469,8 @@ class ParcelDataMapper(Mapper):
         if not remaining_reference:
             return []
         abbreviations = identify_parcel_abbreviations(remaining_reference)
-        division = '2ème division' if self.getData('AdresseTravauxVille', line) == u'Wauthier-Braine' else '1ère division'
-        if not remaining_reference or not section:
+        division = '25015' if self.getData('AdresseTravauxVille', line) == 'Wauthier-Braine' else '25111'
+        if not remaining_reference or not section or not abbreviations:
             return []
         base_reference = parse_cadastral_reference(division + section + abbreviations[0])
 
@@ -527,12 +527,12 @@ class DepositEventMapper(Mapper):
     def mapEventtype(self, line):
         licence = self.importer.current_containers_stack[-1]
         urban_tool = api.portal.get_tool('portal_urban')
-        eventtype_id = 'depot-de-la-demande'
+        eventtype_id = self.getValueMapping('eventtype_id_map')[licence.portal_type]['decision_event']
         config = urban_tool.getUrbanConfig(licence)
         return getattr(config.urbaneventtypes, eventtype_id).UID()
 
 
-class DepositDate_1_Mapper(Mapper):
+class DepositDateMapper(Mapper):
 
     def mapEventdate(self, line):
         date = self.getData('Recepisse')
@@ -542,10 +542,10 @@ class DepositDate_1_Mapper(Mapper):
         return date
 
 
-class DepositEvent_1_IdMapper(Mapper):
+class DepositEventIdMapper(Mapper):
 
     def mapId(self, line):
-        return 'deposit-1'
+        return 'deposit_event'
 
 
 #
