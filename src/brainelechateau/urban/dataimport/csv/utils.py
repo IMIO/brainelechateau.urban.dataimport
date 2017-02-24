@@ -206,7 +206,7 @@ def create_parcel(parcelling, section1, num1, num1suite, division):
     if not remaining_reference:
         return []
     abbreviations = identify_parcel_abbreviations(remaining_reference)
-    division = '2' if division == u'Wauthier-Braine' else '1'
+    division = '25111' if division == 'Wauthier-Braine' else '25015'
     if not remaining_reference or not section1:
         return []
     abbrev = '' if len(abbreviations) == 0  else abbreviations[0]
