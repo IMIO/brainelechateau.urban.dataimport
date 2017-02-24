@@ -469,7 +469,7 @@ class ParcelDataMapper(Mapper):
         if not remaining_reference:
             return []
         abbreviations = identify_parcel_abbreviations(remaining_reference)
-        division = '25015' if self.getData('AdresseTravauxVille', line) == 'Wauthier-Braine' else '25111'
+        division = '25111' if self.getData('AdresseTravauxVille', line) == 'Wauthier-Braine' else '25015'
         if not remaining_reference or not section or not abbreviations:
             return []
         base_reference = parse_cadastral_reference(division + section + abbreviations[0])
