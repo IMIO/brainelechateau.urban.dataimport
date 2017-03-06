@@ -58,8 +58,13 @@ class IdMapper(Mapper):
 
 class PortalTypeMapper(Mapper):
     def mapPortal_type(self, line):
-        portal_type = 'BuildLicence'
-        return portal_type
+        type = self.getData('Reference')
+        if type and len(type) >= 3:
+            type_map = self.getValueMapping('type_map')
+            portal_type = type_map(type.strip()[0:3])
+
+            return portal_type
+
 
     def mapFoldercategory(self, line):
         foldercategory = 'uat'

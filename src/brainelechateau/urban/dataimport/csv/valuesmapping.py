@@ -4,6 +4,10 @@ from imio.urban.dataimport.mapping import table
 
 VALUES_MAPS = {
 
+    'type_map': {
+        'PUR': 'BuildLicence',
+    },
+
     'eventtype_id_map': table({
         'header'             : ['decision_event', 'college_report_event', 'deposit_event'],
         'BuildLicence'       : ['delivrance-du-permis-octroi-ou-refus', 'rapport-du-college', 'depot-de-la-demande'],

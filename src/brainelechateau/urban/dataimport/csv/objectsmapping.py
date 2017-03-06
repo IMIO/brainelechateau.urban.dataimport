@@ -43,7 +43,7 @@ FIELDS_MAPPINGS = {
             },
 
             PortalTypeMapper: {
-                'from': 'Type',
+                'from': 'Reference',
                 'to': ('portal_type', 'folderCategory',)
             },
 
