@@ -306,7 +306,7 @@ OBJECTS_NESTING_OLD = [
     (
         'OLD_LICENCE', [
             ('OLD_CONTACT', []),
-            # ('OLD_PARCEL', []),
+            ('OLD_PARCEL', []),
             ('OLD DECISION EVENT', []),
         ],
     ),
@@ -370,8 +370,8 @@ FIELDS_MAPPINGS_OLD = {
         'factory': [ParcelFactory, {'portal_type': 'PortionOut'}],
 
         'mappers': {
-            ParcelDataMapper: {
-                'from': ('Parcelle1section', 'Parcelle1numero', 'Parcelle1numerosuite', 'Parcelle2section', 'Parcelle2numero', 'Parcelle2numerosuite', 'AdresseTravauxVille'),
+            OldParcelDataMapper: {
+                'from': 'Cadastre',
                 'to': (),
             },
         },
@@ -390,14 +390,6 @@ FIELDS_MAPPINGS_OLD = {
                 {
                     'from': 'Rue Demandeur',
                     'to': 'street',
-                },
-                {
-                    'from': 'Ville Demandeur',
-                    'to': 'city',
-                },
-                {
-                    'from': 'Ville Demandeur',
-                    'to': 'zipcode',
                 },
             ),
 

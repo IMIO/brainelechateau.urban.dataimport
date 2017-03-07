@@ -51,7 +51,7 @@ class IdMapper(Mapper):
         load_architects()
         load_geometers()
         load_notaries()
-        load_parcellings()
+        # load_parcellings()
 
     def mapId(self, line):
         return normalizeString(self.getData('id'))
@@ -137,7 +137,7 @@ class WorklocationOldMapper(Mapper):
             return ({'street': brains[0].UID, 'number': num},)
         if street:
             self.logError(self, line, 'Couldnt find street or found too much streets', {
-                'address': '%s, %s' % (num, raw_street),
+                'address': '%s' % (raw_street),
                 'street': street_keywords,
                 'search result': len(brains)
             })
@@ -152,8 +152,8 @@ class CityMapper(Mapper):
 
 class PostalCodeMapper(Mapper):
     def mapZipcode(self, line):
-        city = self.getData('Ville Demandeur')
-        return (''.join(ele for ele in city if ele.isdigit())).strip()
+        zip = self.getData('Ville Demandeur')
+        return (''.join(ele for ele in zip if ele.isdigit())).strip()
 
 
 class WorkTypeMapper(Mapper):
@@ -577,6 +577,33 @@ class ParcelDataMapper(Mapper):
                 parcels.append(new_parcel2)
 
         return parcels
+
+
+class OldParcelDataMapper(Mapper):
+    def map(self, line, **kwargs):
+        raw_parcel = self.getData('Cadastre', line)
+        if raw_parcel:
+            section = raw_parcel[0].upper()
+            remaining_reference = raw_parcel[1:]
+            remaining_reference = remaining_reference.replace("-","").strip()
+            if not remaining_reference:
+                return []
+            abbreviations = identify_parcel_abbreviations(remaining_reference)
+            division = '25015'
+            if not remaining_reference or not section or not abbreviations:
+                return []
+            base_reference = parse_cadastral_reference(division + section + abbreviations[0])
+
+            base_reference = CadastralReference(*base_reference)
+
+            parcels = [base_reference]
+            for abbreviation in abbreviations[1:]:
+                new_parcel = guess_cadastral_reference(base_reference, abbreviation)
+                parcels.append(new_parcel)
+
+            return parcels
+
+        raise NoObjectToCreateException
 
 
 #
