@@ -12,6 +12,13 @@
     />
 
     <adapter
+        for="imio.urban.dataimport.interfaces.IImportSettingsForm"
+        factory=".settings.BrainelechateauOldCsvImporterFromImportSettings"
+        provides="imio.urban.dataimport.csv.interfaces.ICSVImporter"
+        name="brainelechateau csv old licences"
+    />
+
+    <adapter
         for="imio.urban.dataimport.csv.interfaces.ICSVImporter"
         factory=".importer.BrainelechateauCSVMapping"
         provides="imio.urban.dataimport.interfaces.IObjectsMapping"

@@ -13,7 +13,7 @@ from imio.urban.dataimport.csv.settings import CSVImporterFromImportSettings
 class CSVImporterSettings(ImporterSettings):
     """
     """
-
+    file_type = None
 
 class BrainelechateauCsvImporterFromImportSettings(CSVImporterFromImportSettings):
     """ """
@@ -22,10 +22,30 @@ class BrainelechateauCsvImporterFromImportSettings(CSVImporterFromImportSettings
         """
         Return the db name to read.
         """
+        CSVImporterSettings.file_type = 'new'
         settings = super(BrainelechateauCsvImporterFromImportSettings, self).get_importer_settings()
         db_settings = {
             'key_column': 'id',
             'csv_filename': 'brainelechateau_new_20170223.csv',
+        }
+
+        settings.update(db_settings)
+
+        return settings
+
+
+class BrainelechateauOldCsvImporterFromImportSettings(CSVImporterFromImportSettings):
+    """ """
+
+    def get_importer_settings(self):
+        """
+        Return the db name to read.
+        """
+        CSVImporterSettings.file_type = 'old'
+        settings = super(BrainelechateauOldCsvImporterFromImportSettings, self).get_importer_settings()
+        db_settings = {
+            'key_column': 'id',
+            'csv_filename': 'brainelechateau_old_20170223.csv',
         }
 
         settings.update(db_settings)

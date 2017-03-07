@@ -300,3 +300,153 @@ FIELDS_MAPPINGS = {
         },
     },
 }
+
+
+OBJECTS_NESTING_OLD = [
+    (
+        'OLD_LICENCE', [
+            ('OLD_CONTACT', []),
+            # ('OLD_PARCEL', []),
+            ('OLD DECISION EVENT', []),
+        ],
+    ),
+]
+
+
+FIELDS_MAPPINGS_OLD = {
+    'OLD_LICENCE':
+    {
+        'factory': [LicenceFactory],
+
+        'mappers': {
+            SimpleMapper: (
+                {
+                    'from': 'Objet',
+                    'to': 'licenceSubject',
+                },
+            ),
+
+            IdMapper: {
+                'from': 'id',
+                'to': 'id',
+            },
+
+            ReferenceMapper: {
+                'from': ('Numero Permis', 'id'),
+                'to': 'reference',
+            },
+
+
+
+            PortalTypeMapper: {
+                'from': '',
+                'to': ('portal_type', 'folderCategory',)
+            },
+
+            WorklocationOldMapper: {
+                'from': 'Lieu de construction',
+                'to': 'workLocations',
+            },
+
+            ObservationsOldMapper: {
+                'from': 'Remarques',
+                'to': 'description',
+            },
+
+            CompletionStateMapper: {
+                'from': 'Type Decision',
+                'to': (),  # <- no field to fill, its the workflow state that has to be changed
+            },
+
+            ErrorsMapper: {
+                'from': (),
+                'to': ('description',),  # log all the errors in the description field
+            }
+        },
+    },
+
+    'OLD_PARCEL':
+    {
+        'factory': [ParcelFactory, {'portal_type': 'PortionOut'}],
+
+        'mappers': {
+            ParcelDataMapper: {
+                'from': ('Parcelle1section', 'Parcelle1numero', 'Parcelle1numerosuite', 'Parcelle2section', 'Parcelle2numero', 'Parcelle2numerosuite', 'AdresseTravauxVille'),
+                'to': (),
+            },
+        },
+    },
+
+    'OLD_CONTACT':
+    {
+        'factory': [ContactFactory],
+
+        'mappers': {
+            SimpleMapper: (
+                {
+                    'from': 'Nom Demandeur',
+                    'to': 'name1',
+                },
+                {
+                    'from': 'Rue Demandeur',
+                    'to': 'street',
+                },
+                {
+                    'from': 'Ville Demandeur',
+                    'to': 'city',
+                },
+                {
+                    'from': 'Ville Demandeur',
+                    'to': 'zipcode',
+                },
+            ),
+
+            CityMapper: {
+                'from': 'Ville Demandeur',
+                'to': 'city',
+            },
+
+            PostalCodeMapper: {
+                'from': 'Ville Demandeur',
+                'to': 'zipcode',
+            },
+
+            ContactIdOldMapper: {
+                'from': ('Nom Demandeur', 'id'),
+                'to': 'id',
+            },
+        },
+    },
+
+    'OLD DECISION EVENT':
+    {
+        'factory': [UrbanEventFactory],
+
+        'mappers': {
+            DecisionEventTypeMapper: {
+                'from': (),
+                'to': 'eventtype',
+            },
+
+            DecisionEventIdMapper: {
+                'from': (),
+                'to': 'id',
+            },
+
+            OldDecisionEventDateMapper: {
+                'from': 'Date Permis',
+                'to': 'decisionDate',
+            },
+
+            OldDecisionEventDecisionMapper: {
+                'from': 'Type Decision',
+                'to': 'decision',
+            },
+
+            OldDecisionEventNotificationDateMapper: {
+                'from': 'Date Permis',
+                'to': 'eventDate',
+            }
+        },
+    },
+}

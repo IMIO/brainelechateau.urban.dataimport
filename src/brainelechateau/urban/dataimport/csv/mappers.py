@@ -3,6 +3,7 @@ import unicodedata
 
 import datetime
 
+from brainelechateau.urban.dataimport.csv.settings import CSVImporterSettings
 from brainelechateau.urban.dataimport.csv.utils import get_state_from_licences_dates, get_date_from_licences_dates, \
     load_architects, load_geometers, load_notaries, load_parcellings
 from imio.urban.dataimport.config import IMPORT_FOLDER_PATH
@@ -56,12 +57,26 @@ class IdMapper(Mapper):
         return normalizeString(self.getData('id'))
 
 
+class ReferenceMapper(Mapper):
+
+    def mapReference(self, line):
+        licence_num = self.getData('Numero Permis')
+        if licence_num.strip():
+            return licence_num
+        else:
+            id = self.getData('id')
+            return "NC/%s" % (id)
+
+
+
 class PortalTypeMapper(Mapper):
     def mapPortal_type(self, line):
+        if CSVImporterSettings.file_type == 'old':
+            return 'BuildLicence'
         type = self.getData('Reference')
         if type and len(type) >= 3:
             type_map = self.getValueMapping('type_map')
-            portal_type = type_map(type.strip()[0:3])
+            portal_type = type_map[type.strip()[0:3]]
 
             return portal_type
 
@@ -83,8 +98,8 @@ class WorklocationMapper(Mapper):
         num = self.getData('AdresseTravauxNumero')
         noisy_words = set(('d', 'du', 'de', 'des', 'le', 'la', 'les', 'à', ',', 'rues', 'terrain', 'terrains', 'garage', 'magasin', 'entrepôt'))
         raw_street = self.getData('AdresseTravauxRue')
-        if raw_street.endswith(')'):
-            raw_street = raw_street[:-5]
+        # remove string in () and []
+        raw_street = re.sub("[\(\[].*?[\)\]]", "", raw_street)
         street = cleanAndSplitWord(raw_street)
         street_keywords = [word for word in street if word not in noisy_words and len(word) > 1]
         if len(street_keywords) and street_keywords[-1] == 'or':
@@ -103,6 +118,42 @@ class WorklocationMapper(Mapper):
                 'search result': len(brains)
             })
         return {}
+
+
+class WorklocationOldMapper(Mapper):
+    def mapWorklocations(self, line):
+        noisy_words = set(('d', 'du', 'de', 'des', 'le', 'la', 'les', 'à', ',', 'rues', 'terrain', 'terrains', 'garage', 'magasin', 'entrepôt'))
+        raw_street = self.getData('Lieu de construction')
+        num = ''.join(ele for ele in raw_street if ele.isdigit())
+        # remove string in () and []
+        raw_street = re.sub("[\(\[].*?[\)\]]", "", raw_street)
+        street = cleanAndSplitWord(raw_street)
+        street_keywords = [word for word in street if word not in noisy_words and len(word) > 1]
+        if len(street_keywords) and street_keywords[-1] == 'or':
+            street_keywords = street_keywords[:-1]
+
+        brains = self.catalog(portal_type='Street', Title=street_keywords)
+        if len(brains) == 1:
+            return ({'street': brains[0].UID, 'number': num},)
+        if street:
+            self.logError(self, line, 'Couldnt find street or found too much streets', {
+                'address': '%s, %s' % (num, raw_street),
+                'street': street_keywords,
+                'search result': len(brains)
+            })
+        return {}
+
+
+class CityMapper(Mapper):
+    def mapCity(self, line):
+        city = self.getData('Ville Demandeur')
+        return (''.join(ele for ele in city if not ele.isdigit())).strip()
+
+
+class PostalCodeMapper(Mapper):
+    def mapZipcode(self, line):
+        city = self.getData('Ville Demandeur')
+        return (''.join(ele for ele in city if ele.isdigit())).strip()
 
 
 class WorkTypeMapper(Mapper):
@@ -180,6 +231,12 @@ class AskOpinionsMapper(Mapper):
 class ObservationsMapper(Mapper):
     def mapDescription(self, line):
         description = '<p>%s</p> <p>%s</p>' % (self.getData('ParticularitesEnq1'),self.getData('ParticularitesEnq2'))
+        return description
+
+
+class ObservationsOldMapper(Mapper):
+    def mapDescription(self, line):
+        description = '<p>%s</p>' % (self.getData('Remarques'))
         return description
 
 
@@ -286,11 +343,18 @@ class EnvRubricsMapper(Mapper):
 class CompletionStateMapper(PostCreationMapper):
     def map(self, line, plone_object):
         self.line = line
-        datePermis = self.getData('Date Permis')
-        dateRefus = self.getData('Date Refus')
-        datePermisRecours = self.getData('Date Permis sur recours')
-        dateRefusRecours = self.getData('Date Refus sur recours')
-        transition = get_state_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
+        if CSVImporterSettings.file_type == 'old':
+            type_decision = self.getData('Type Decision')
+            if type_decision == 'REFUS':
+                transition = 'refuse'
+            else:
+                transition = 'accept'
+        else:
+            datePermis = self.getData('Date Permis')
+            dateRefus = self.getData('Date Refus')
+            datePermisRecours = self.getData('Date Permis sur recours')
+            dateRefusRecours = self.getData('Date Refus sur recours')
+            transition = get_state_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
 
         if transition:
             api.content.transition(plone_object, transition)
@@ -343,6 +407,13 @@ class ContactFactory(BaseFactory):
 class ContactIdMapper(Mapper):
     def mapId(self, line):
         name = '%s%s%s' % (self.getData('NomDemandeur1'), self.getData('PrenomDemandeur1'), self.getData('id'))
+        name = name.replace(' ', '').replace('-', '')
+        return normalizeString(self.site.portal_urban.generateUniqueId(name))
+
+
+class ContactIdOldMapper(Mapper):
+    def mapId(self, line):
+        name = '%s%s' % (self.getData('Nom Demandeur'), self.getData('id'))
         name = name.replace(' ', '').replace('-', '')
         return normalizeString(self.site.portal_urban.generateUniqueId(name))
 
@@ -782,6 +853,36 @@ class DecisionEventNotificationDateMapper(Mapper):
         if eventDate:
             return eventDate
         else:
+            raise NoObjectToCreateException
+
+
+class OldDecisionEventDateMapper(Mapper):
+    def mapDecisiondate(self, line):
+        datePermis = self.getData('Date Permis')
+        try:
+            date = datetime.datetime.strptime(datePermis, "%d.%m.%y")
+            return date
+        except ValueError:
+            return
+
+
+class OldDecisionEventDecisionMapper(Mapper):
+    def mapDecision(self, line):
+        decision = self.getData('Type Decision')
+
+        if decision == 'REFUS':
+            return u'Défavorable'
+        else:
+            return u'Favorable'
+
+
+class OldDecisionEventNotificationDateMapper(Mapper):
+    def mapEventdate(self, line):
+        datePermis = self.getData('Date Permis')
+        try:
+            date = datetime.datetime.strptime(datePermis, "%d.%m.%y")
+            return date
+        except ValueError:
             raise NoObjectToCreateException
 
 
