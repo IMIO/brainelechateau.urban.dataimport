@@ -51,7 +51,7 @@ class IdMapper(Mapper):
         load_architects()
         load_geometers()
         load_notaries()
-        # load_parcellings()
+        load_parcellings()
 
     def mapId(self, line):
         return normalizeString(self.getData('id'))
@@ -887,8 +887,10 @@ class OldDecisionEventDateMapper(Mapper):
     def mapDecisiondate(self, line):
         datePermis = self.getData('Date Permis')
         try:
-            date = datetime.datetime.strptime(datePermis, "%d.%m.%y")
-            return date
+            d = datetime.datetime.strptime(datePermis, "%d.%m.%y")
+            if d > datetime.now():
+                d = datetime(d.year - 100, d.month, d.day)
+            return d
         except ValueError:
             return
 
@@ -907,8 +909,10 @@ class OldDecisionEventNotificationDateMapper(Mapper):
     def mapEventdate(self, line):
         datePermis = self.getData('Date Permis')
         try:
-            date = datetime.datetime.strptime(datePermis, "%d.%m.%y")
-            return date
+            d = datetime.datetime.strptime(datePermis, "%d.%m.%y")
+            if d > datetime.now():
+                d = datetime(d.year - 100, d.month, d.day)
+            return d
         except ValueError:
             raise NoObjectToCreateException
 
