@@ -2,10 +2,11 @@
 
 import csv
 from plone.i18n.normalizer import idnormalizer
+
+from Products.CMFPlone.utils import normalizeString
 from plone import api
 
 from imio.urban.dataimport.config import IMPORT_FOLDER_PATH
-from imio.urban.dataimport.errors import NoPortalTypeError, IdentifierError
 from imio.urban.dataimport.utils import identify_parcel_abbreviations, parse_cadastral_reference, CadastralReference, \
     guess_cadastral_reference
 
@@ -275,3 +276,8 @@ def create_parcel(parcelling, section1, num1, num1suite, division):
                                                     divisionCode=parcel_args['division'])
 
         return object_id
+
+
+def get_point_and_digits(string):
+
+    return ''.join([letter for letter in string if (letter.isdigit() or letter == '.')]).strip()

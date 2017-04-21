@@ -10,8 +10,13 @@ OBJECTS_NESTING = [
             ('PARCEL', []),
             ('DEPOSIT EVENT', []),
             ('DECISION EVENT', []),
+            ('ACCEPTABLE DECLARATION EVENT', []),
+            ('ACCEPTABLE CONDITIONAL DECLARATION EVENT', []),
+            ('UNACCEPTABLE DECLARATION EVENT', []),
             ('COLLEGE REPORT EVENT', []),
-            # ('DOCUMENTS', []),
+            ('TRANSMITTED DECISION EVENT', []),
+            ('COMPLETE FOLDER EVENT', []),
+            ('INCOMPLETE FOLDER EVENT', []),
         ],
     ),
 ]
@@ -35,6 +40,10 @@ FIELDS_MAPPINGS = {
                     'from': 'Delai annonce',
                     'to': 'annoncedDelay',
                 },
+                {
+                    'from': 'Remarques',
+                    'to': 'description',
+                },
             ),
 
             IdMapper: {
@@ -42,9 +51,19 @@ FIELDS_MAPPINGS = {
                 'to': 'id',
             },
 
+            ReferenceMapper: {
+                'from': ('Numero Permis', 'Reference'),
+                'to': 'reference',
+            },
+
             PortalTypeMapper: {
-                'from': 'Reference',
+                'from': 'Type',
                 'to': ('portal_type', 'folderCategory',)
+            },
+
+            ReferenceDGO3Mapper: {
+                'from': ('PENReference DGO3', 'Type'),
+                'to': 'referenceDGATLP'
             },
 
             WorklocationMapper: {
@@ -52,18 +71,26 @@ FIELDS_MAPPINGS = {
                 'to': 'workLocations',
             },
 
-           ArchitectMapper: {
+            ArchitectMapper: {
                'allowed_containers': ['BuildLicence'],
                'from': ('Nom Architecte', 'Prenom Architecte', 'Societe Architecte'),
                'to': ('architects',)
-           },
+            },
 
             FolderZoneTableMapper: {
                'from': ('Plan de Secteur 1', 'Plan de Secteur 2'),
                'to': 'folderZone',
-           },
+            },
 
+            ParcellingUIDMapper: {
+                'from': 'Lotissement',
+                'to': 'parcellings',
+            },
 
+            IsInSubdivisionMapper: {
+                'from': 'Lotissement',
+                'to': 'isInSubdivision',
+            },
 
             # WorkTypeMapper: {
             #     'allowed_containers': ['BuildLicence', 'ParcelOutLicence'],
@@ -94,6 +121,11 @@ FIELDS_MAPPINGS = {
                 'to': 'solicitOpinionsTo',
             },
 
+            RubricsMapper: {
+                'from': 'DENRubrique1',
+                'to': 'rubrics'
+            },
+
             #
             # InquiryReclamationNumbersMapper: {
             #     'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'UrbanCertificateTwo'],
@@ -117,11 +149,11 @@ FIELDS_MAPPINGS = {
             #     'to': 'locationTechnicalConditions',
             # },
 
-#            GeometricianMapper: {
-#                'allowed_containers': ['ParcelOutLicence'],
-#                'from': ('Titre', 'Nom', 'Prenom'),
-#                'to': ('geometricians',)
-#            },
+           GeometricianMapper: {
+               'allowed_containers': ['ParcelOutLicence'],
+               'from': ('LOTGeoTitre', 'LOTGeoNom', 'LOTGeoPrenom'),
+               'to': ('geometricians',)
+           },
 
             # ParcellingsMapper: {
             #     'table': 'LOTISSEM',
@@ -174,7 +206,7 @@ FIELDS_MAPPINGS = {
             # },
             #
             CompletionStateMapper: {
-                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
+                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours', 'DURDecision', 'CU2Decision', 'DENDecision'),
                 'to': (),  # <- no field to fill, its the workflow state that has to be changed
             },
 
@@ -215,6 +247,14 @@ FIELDS_MAPPINGS = {
                     'from': ('AdresseDemandeur1'),
                     'to': 'street',
                 },
+{
+                    'from': 'CodePostalDemandeur1',
+                    'to': 'zipcode',
+                },
+{
+                    'from': 'VilleDemandeur1',
+                    'to': 'city',
+                },
             ),
 
             ContactIdMapper: {
@@ -227,6 +267,7 @@ FIELDS_MAPPINGS = {
     'DECISION EVENT':
     {
         'factory': [UrbanEventFactory],
+        'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'Declaration', 'EnvClassOne', 'EnvClassTwo'],
 
         'mappers': {
             DecisionEventTypeMapper: {
@@ -240,17 +281,17 @@ FIELDS_MAPPINGS = {
             },
 
             DecisionEventDateMapper: {
-                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
+                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours', 'DURDecision', 'DURDateDecision', 'DURDateTransmission', 'CU2DateDecision', 'DENDateIrrecevable', 'DENDatePriseActeSansConditions', 'DENDatePriseActeAvecConditions'),
                 'to': 'decisionDate',
             },
 
             DecisionEventDecisionMapper: {
-                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
+                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours', 'DURDecision', 'CU2Decision', 'DENDecision'),
                 'to': 'decision',
             },
 
             DecisionEventNotificationDateMapper: {
-                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours'),
+                'from': ('Date Permis', 'Date Refus', 'Date Permis sur recours', 'Date Refus sur recours', 'DURDecision', 'DURDateDecision', 'DURDateTransmission', 'CU2DateDecision', 'DENDateIrrecevable', 'DENDatePriseActeSansConditions', 'DENDatePriseActeAvecConditions'),
                 'to': 'eventDate',
             }
         },
@@ -281,6 +322,7 @@ FIELDS_MAPPINGS = {
     'COLLEGE REPORT EVENT':
     {
         'factory': [UrbanEventFactory],
+        'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'EnvClassThree'],
 
         'mappers': {
             CollegeReportTypeMapper: {
@@ -299,6 +341,150 @@ FIELDS_MAPPINGS = {
             }
         },
     },
+
+    'TRANSMITTED DECISION EVENT':
+    {
+        'factory': [UrbanEventFactory],
+        'allowed_containers': ['Declaration'],
+
+        'mappers': {
+            TransmittedEventMapper: {
+                'from': (),
+                'to': 'eventtype',
+            },
+
+            DateTransmissionMapper: {
+                'from': 'DURDateTransmission',
+                'to': 'eventDate',
+            },
+
+            DateTransmissionEventIdMapper: {
+                'from': (),
+                'to': 'id',
+            }
+        },
+    },
+
+    'ACCEPTABLE DECLARATION EVENT':
+        {
+            'factory': [UrbanEventFactory],
+            'allowed_containers': ['EnvClassThree'],
+
+            'mappers': {
+                EnvClassThreeAcceptabilityEventMapper: {
+                    'from': (),
+                    'to': 'eventtype',
+                },
+
+                EnvClassThreeAcceptabilityEventIdMapper: {
+                    'from': (),
+                    'to': 'id',
+                },
+
+                EventDateEnvClassThreeAcceptabilityMapper: {
+                    'from': ('DENDecision', 'DENDatePriseActeSansConditions',),
+                    'to': ('eventDate'),
+                },
+
+            },
+        },
+
+    'UNACCEPTABLE DECLARATION EVENT':
+        {
+            'factory': [UrbanEventFactory],
+            'allowed_containers': ['EnvClassThree'],
+
+            'mappers': {
+                EnvClassThreeUnacceptabilityEventMapper: {
+                    'from': (),
+                    'to': 'eventtype',
+                },
+
+                EnvClassThreeUnacceptabilityEventIdMapper: {
+                    'from': (),
+                    'to': 'id',
+                },
+
+                EventDateEnvClassThreeUnacceptabilityMapper: {
+                    'from': ('DENDecision', 'DENDateIrrecevable',),
+                    'to': ('eventDate'),
+                },
+
+            },
+        },
+
+
+    'ACCEPTABLE CONDITIONAL DECLARATION EVENT':
+        {
+            'factory': [UrbanEventFactory],
+            'allowed_containers': ['EnvClassThree'],
+
+            'mappers': {
+                EnvClassThreeCondAcceptabilityEventMapper: {
+                    'from': (),
+                    'to': 'eventtype',
+                },
+
+                EnvClassThreeCondAcceptabilityEventIdMapper: {
+                    'from': (),
+                    'to': 'id',
+                },
+
+                EventDateEnvClassThreeCondAcceptabilityMapper: {
+                    'from': ('DENDecision', 'DENDatePriseActeAvecConditions',),
+                    'to': ('eventDate'),
+                },
+
+            },
+        },
+
+    'COMPLETE FOLDER EVENT':
+        {
+            'factory': [UrbanEventFactory],
+            'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'EnvClassOne', 'EnvClassTwo'],
+
+            'mappers': {
+                CompleteFolderEventMapper: {
+                    'from': (),
+                    'to': 'eventtype',
+                },
+
+                CompleteFolderEventIdMapper: {
+                    'from': (),
+                    'to': 'id',
+                },
+
+                CompleteFolderDateMapper: {
+                    'from': ('PENDtDossierComplet',),
+                    'to': ('eventDate'),
+                },
+
+            },
+        },
+
+    'INCOMPLETE FOLDER EVENT':
+        {
+            'factory': [UrbanEventFactory],
+            'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'UrbanCertificateTwo', 'EnvClassOne', 'EnvClassTwo'],
+
+            'mappers': {
+                IncompleteFolderEventMapper: {
+                    'from': (),
+                    'to': 'eventtype',
+                },
+
+                IncompleteFolderEventIdMapper: {
+                    'from': (),
+                    'to': 'id',
+                },
+
+                IncompleteFolderDateMapper: {
+                    'from': ('PENDtDossierIncomplet',),
+                    'to': ('eventDate'),
+                },
+
+            },
+        },
 }
 
 
@@ -336,8 +522,6 @@ FIELDS_MAPPINGS_OLD = {
                 'to': 'reference',
             },
 
-
-
             PortalTypeMapper: {
                 'from': '',
                 'to': ('portal_type', 'folderCategory',)
@@ -346,6 +530,21 @@ FIELDS_MAPPINGS_OLD = {
             WorklocationOldMapper: {
                 'from': 'Lieu de construction',
                 'to': 'workLocations',
+            },
+
+            # ParcellingUIDMapper: {
+            #     'from': 'Lotissement',
+            #     'to': 'parcellings',
+            # },
+
+            IsInSubdivisionMapper: {
+                'from': 'Lotissement',
+                'to': 'isInSubdivision',
+            },
+
+            SubdivisionDetailsMapper: {
+                'from': 'Lot',
+                'to': 'subdivisionDetails',
             },
 
             ObservationsOldMapper: {

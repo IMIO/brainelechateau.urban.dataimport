@@ -5,7 +5,7 @@ import datetime
 
 from brainelechateau.urban.dataimport.csv.settings import CSVImporterSettings
 from brainelechateau.urban.dataimport.csv.utils import get_state_from_licences_dates, get_date_from_licences_dates, \
-    load_architects, load_geometers, load_notaries, load_parcellings
+    load_architects, load_geometers, load_notaries, load_parcellings, get_point_and_digits
 from imio.urban.dataimport.config import IMPORT_FOLDER_PATH
 
 from imio.urban.dataimport.exceptions import NoObjectToCreateException
@@ -60,12 +60,25 @@ class IdMapper(Mapper):
 class ReferenceMapper(Mapper):
 
     def mapReference(self, line):
-        licence_num = self.getData('Numero Permis')
-        if licence_num.strip():
-            return licence_num
-        else:
-            id = self.getData('id')
-            return "NC/%s" % (id)
+        if CSVImporterSettings.file_type == 'old':
+            ref = self.getData('Numero Permis') + " old"
+            if ref.strip():
+                return ref
+            else:
+                id = self.getData('id')
+                return "NC/%s" % (id)  + " old"
+        elif CSVImporterSettings.file_type == 'new':
+            return self.getData('Reference')  + " new"
+
+
+class ReferenceDGO3Mapper(Mapper):
+
+    def mapReferencedgatlp(self, line):
+        type = self.getData('Type')
+        if type and type.startswith("PE1") or type.startswith("PE2"):
+            dg03ref = self.getData('PENReference DGO3')
+            if dg03ref:
+                return dg03ref
 
 
 
@@ -73,12 +86,23 @@ class PortalTypeMapper(Mapper):
     def mapPortal_type(self, line):
         if CSVImporterSettings.file_type == 'old':
             return 'BuildLicence'
-        type = self.getData('Reference')
+        type = self.getData('Type')
+        # if type and type.startswith("PE1"):
+        #     return "EnvClassOne"
+        # elif type and type.startswith("PE2"):
+        #     return "EnvClassTwo"
+        # else:
+        #     raise NoObjectToCreateException
         if type and len(type) >= 3:
             type_map = self.getValueMapping('type_map')
-            portal_type = type_map[type.strip()[0:3]]
+            base_type = type.strip()[0:3]
+            # if base_type in ['PE', 'PEX', 'PUN']:
+            #     base_type = type.strip()[0:4]
+            portal_type = type_map[base_type]
 
             return portal_type
+        else:
+            raise NoObjectToCreateException
 
 
     def mapFoldercategory(self, line):
@@ -156,6 +180,41 @@ class PostalCodeMapper(Mapper):
         return (''.join(ele for ele in zip if ele.isdigit())).strip()
 
 
+class ParcellingUIDMapper(Mapper):
+
+    def mapParcellings(self, line):
+        title = self.getData('Lotissement')
+        if title:
+            title = title.replace("(phase I)","").strip()
+            title = title.replace("(partie 1)","").strip()
+            title = title.replace("(partie 2)","").strip()
+            catalog = api.portal.get_tool('portal_catalog')
+            brains = catalog(portal_type='ParcellingTerm', Title=title)
+            parcelling_uids = [brain.getObject().UID() for brain in brains]
+            if len(parcelling_uids) == 1:
+                return parcelling_uids
+            if parcelling_uids:
+                self.logError(self, line, 'Couldnt find parcelling or found too much parcellings', {
+                    'titre': '%s' % title,
+                    'search result': len(parcelling_uids)
+                })
+
+
+
+class IsInSubdivisionMapper(Mapper):
+
+    def mapIsinsubdivision(self, line):
+        title = self.getData('Lotissement')
+        return bool(title)
+
+
+class SubdivisionDetailsMapper(Mapper):
+
+    def mapSubdivisiondetails(self, line):
+        lot = self.getData('Lot')
+        return lot
+
+
 class WorkTypeMapper(Mapper):
     def mapWorktype(self, line):
         worktype = self.getData('Code_220+')
@@ -165,14 +224,16 @@ class WorkTypeMapper(Mapper):
 class InquiryStartDateMapper(Mapper):
     def mapInvestigationstart(self, line):
         date = self.getData('DateDebEnq')
-        date = date and DateTime(date) or None
+        if date:
+            date = datetime.datetime.strptime(date, "%d/%m/%Y")
         return date
 
 
 class InquiryEndDateMapper(Mapper):
     def mapInvestigationend(self, line):
         date = self.getData('DateFinEnq')
-        date = date and DateTime(date) or None
+        if date:
+            date = datetime.datetime.strptime(date, "%d/%m/%Y")
         return date
 
 class InvestigationReasonsMapper(Mapper):
@@ -228,6 +289,35 @@ class AskOpinionsMapper(Mapper):
         return ask_opinions
 
 
+class RubricsMapper(Mapper):
+
+    def mapRubrics(self, line):
+        rubric_list = []
+        # licence = self.importer.current_containers_stack[-1]
+        # if licence.portal_type == 'EnvClassThree':
+        rubric_raw = self.getData('DENRubrique1')
+        if rubric_raw:
+            rubric_raw.replace("//", "/")
+            rubrics = rubric_raw.split("/")
+            if rubrics:
+                for rubric in rubrics:
+                    point_and_digits = get_point_and_digits(rubric)
+                    if point_and_digits and '.' in point_and_digits:
+                        catalog = api.portal.get_tool('portal_catalog')
+                        rubric_uids = [brain.UID for brain in catalog(portal_type='EnvironmentRubricTerm', id=point_and_digits)]
+                        if not rubric_uids:
+                                self.logError(self, line, 'No rubric found',
+                                              {
+                                                  'rubric': point_and_digits,
+                                              })
+                        else:
+                            rubric_list.append(rubric_uids[0])
+
+
+        return rubric_list
+
+
+
 class ObservationsMapper(Mapper):
     def mapDescription(self, line):
         description = '<p>%s</p> <p>%s</p>' % (self.getData('ParticularitesEnq1'),self.getData('ParticularitesEnq2'))
@@ -249,7 +339,8 @@ class TechnicalConditionsMapper(Mapper):
 
 class ArchitectMapper(PostCreationMapper):
     def mapArchitects(self, line, plone_object):
-        archi_name = '%s %s %s' % (self.getData('Nom Architecte'), self.getData('Prenom Architecte'), self.getData('Societe Architecte'))
+        # archi_name = '%s %s %s' % (self.getData('Nom Architecte'), self.getData('Prenom Architecte'), self.getData('Societe Architecte'))
+        archi_name = ' %s %s' % ( self.getData('Prenom Architecte'), self.getData('Societe Architecte'))
         fullname = cleanAndSplitWord(archi_name)
         if not fullname:
             return []
@@ -289,29 +380,26 @@ class FolderZoneTableMapper(Mapper):
 
 class GeometricianMapper(PostCreationMapper):
     def mapGeometricians(self, line, plone_object):
-        title_words = [word for word in self.getData('Titre').lower().split()]
-        for word in title_words:
-            if word not in ['géometre', 'géomètre']:
-                return
-        name = self.getData('Nom')
-        firstname = self.getData('Prenom')
+        name = self.getData('LOTGeoNom')
+        firstname = self.getData('LOTGeoPrenom')
         raw_name = firstname + name
-        name = cleanAndSplitWord(name)
-        firstname = cleanAndSplitWord(firstname)
-        names = name + firstname
-        geometrician = self.catalog(portal_type='Geometrician', Title=names)
-        if not geometrician:
-            geometrician = self.catalog(portal_type='Geometrician', Title=name)
-        if len(geometrician) == 1:
-            return geometrician[0].getObject()
-        self.logError(self, line, 'no geometricians found or too much geometricians found',
-                      {
-                          'raw_name': raw_name,
-                          'title': self.getData('Titre'),
-                          'name': name,
-                          'firstname': firstname,
-                          'search_result': len(geometrician)
-                      })
+        # name = cleanAndSplitWord(name)
+        # firstname = cleanAndSplitWord(firstname)
+        names = name + ' ' + firstname
+        if raw_name:
+            geometrician = self.catalog(portal_type='Geometrician', Title=names)
+            if len(geometrician) == 0:
+                Utils.createGeometrician(name, firstname)
+                geometrician = self.catalog(portal_type='Geometrician', Title=names)
+            if len(geometrician) == 1:
+                return geometrician[0].getObject()
+            self.logError(self, line, 'no geometricians found or too much geometricians found',
+                          {
+                              'raw_name': raw_name,
+                              'name': name,
+                              'firstname': firstname,
+                              'search_result': len(geometrician)
+                          })
         return []
 
 
@@ -343,6 +431,7 @@ class EnvRubricsMapper(Mapper):
 class CompletionStateMapper(PostCreationMapper):
     def map(self, line, plone_object):
         self.line = line
+        transition = None
         if CSVImporterSettings.file_type == 'old':
             type_decision = self.getData('Type Decision')
             if type_decision == 'REFUS':
@@ -350,11 +439,28 @@ class CompletionStateMapper(PostCreationMapper):
             else:
                 transition = 'accept'
         else:
-            datePermis = self.getData('Date Permis')
-            dateRefus = self.getData('Date Refus')
-            datePermisRecours = self.getData('Date Permis sur recours')
-            dateRefusRecours = self.getData('Date Refus sur recours')
-            transition = get_state_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
+            if plone_object.portal_type in ['BuildLicence', 'ParcelOutLicence']:
+                datePermis = self.getData('Date Permis')
+                dateRefus = self.getData('Date Refus')
+                datePermisRecours = self.getData('Date Permis sur recours')
+                dateRefusRecours = self.getData('Date Refus sur recours')
+                transition = get_state_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
+
+            elif plone_object.portal_type == 'Declaration':
+                if self.getData('DURDecision') == 'Favorable':
+                    transition = 'accept'
+                elif self.getData('DURDecision') == 'Défavorable':
+                    transition = 'refuse'
+            elif plone_object.portal_type == 'UrbanCertificateTwo':
+                if self.getData('CU2Decision') == 'Favorable':
+                    transition = 'accept'
+                elif self.getData('CU2Decision') == 'Défavorable':
+                    transition = 'refuse'
+            elif plone_object.portal_type == 'EnvClassThree':
+                if self.getData('DENDecision') == 'irrecevable':
+                    transition = 'refuse'
+                elif self.getData('DENDecision') == 'OK sans conditions' or self.getData('DENDecision') == 'OK avec conditions':
+                    transition = 'accept'
 
         if transition:
             api.content.transition(plone_object, transition)
@@ -380,8 +486,15 @@ class ErrorsMapper(FinalMapper):
                     error_trace.append('<p>architecte : %s</p>' % data['raw_name'])
                 elif 'geometricians' in error.message:
                     error_trace.append('<p>géomètre : %s</p>' % data['raw_name'])
+                elif 'parcels' in error.message and CSVImporterSettings.file_type == 'old':
+                    error_trace.append('<p>parcels : %s </p>' % data['args'])
+                elif 'rubric' in error.message.lower():
+                    error_trace.append('<p>Rubrique non trouvée : %s</p>' % (data['rubric']))
                 elif 'parcelling' in error.message:
-                    error_trace.append('<p>lotissement : %s %s, autorisé le %s</p>' % (data['approval date'], data['city'], data['auth_date']))
+                    if data['search result'] == '0':
+                        error_trace.append('<p>lotissement non trouvé : %s </p>' % data['titre'])
+                    else:
+                        error_trace.append("<p>lotissement trouvé plus d'une fois: %s : %s fois</p>" % (data['titre'], data['search result'] ))
                 elif 'article' in error.message.lower():
                     error_trace.append('<p>Articles de l\'enquête : %s</p>' % (data['articles']))
         error_trace = ''.join(error_trace)
@@ -583,25 +696,27 @@ class OldParcelDataMapper(Mapper):
     def map(self, line, **kwargs):
         raw_parcel = self.getData('Cadastre', line)
         if raw_parcel:
-            section = raw_parcel[0].upper()
-            remaining_reference = raw_parcel[1:]
-            remaining_reference = remaining_reference.replace("-","").strip()
-            if not remaining_reference:
-                return []
-            abbreviations = identify_parcel_abbreviations(remaining_reference)
-            division = '25015'
-            if not remaining_reference or not section or not abbreviations:
-                return []
-            base_reference = parse_cadastral_reference(division + section + abbreviations[0])
-
-            base_reference = CadastralReference(*base_reference)
-
-            parcels = [base_reference]
-            for abbreviation in abbreviations[1:]:
-                new_parcel = guess_cadastral_reference(base_reference, abbreviation)
-                parcels.append(new_parcel)
-
-            return parcels
+            self.logError(self, line, 'parcels', {'args': raw_parcel})
+            # section = raw_parcel[0].upper()
+            # remaining_reference = raw_parcel[1:]
+            # remaining_reference = remaining_reference.replace("-","").strip()
+            # if not remaining_reference:
+            #     return []
+            # abbreviations = identify_parcel_abbreviations(remaining_reference)
+            # division = '25015'
+            # if not remaining_reference or not section or not abbreviations:
+            #     return []
+            # base_reference = parse_cadastral_reference(division + section + abbreviations[0])
+            #
+            # base_reference = CadastralReference(*base_reference)
+            #
+            # parcels = [base_reference]
+            # for abbreviation in abbreviations[1:]:
+            #     new_parcel = guess_cadastral_reference(base_reference, abbreviation)
+            #     self.logError(self, line, 'parcels', {'args': new_parcel})
+            #     parcels.append(new_parcel)
+            #
+            # return parcels
 
         raise NoObjectToCreateException
 
@@ -628,9 +743,10 @@ class UrbanEventFactory(BaseFactory):
 class DepositEventMapper(Mapper):
 
     def mapEventtype(self, line):
+
         licence = self.importer.current_containers_stack[-1]
         urban_tool = api.portal.get_tool('portal_urban')
-        eventtype_id = self.getValueMapping('eventtype_id_map')[licence.portal_type]['decision_event']
+        eventtype_id = self.getValueMapping('eventtype_id_map')[licence.portal_type]['deposit_event']
         config = urban_tool.getUrbanConfig(licence)
         return getattr(config.urbaneventtypes, eventtype_id).UID()
 
@@ -641,14 +757,39 @@ class DepositDateMapper(Mapper):
         date = self.getData('Recepisse')
         if not date:
             raise NoObjectToCreateException
-        date = date and DateTime(date) or None
+        date = datetime.datetime.strptime(date, "%d/%m/%Y")
         return date
 
-
 class DepositEventIdMapper(Mapper):
+    def mapId(self, line):
+        return 'depot-de-la-demande'
+
+# UrbanEvent transmitted decision
+
+class TransmittedIdMapper(Mapper):
 
     def mapId(self, line):
-        return 'deposit_event'
+        return 'transmis-decision'
+
+class TransmittedEventMapper(Mapper):
+    def mapEventtype(self, line):
+        licence = self.importer.current_containers_stack[-1]
+        urban_tool = api.portal.get_tool('portal_urban')
+        eventtype_id = 'transmis-decision'
+        config = urban_tool.getUrbanConfig(licence)
+        return getattr(config.urbaneventtypes, eventtype_id).UID()
+
+class DateTransmissionMapper(Mapper):
+    def mapEventdate(self, line):
+        date = self.getData('DURDateTransmission')
+        if not date:
+            raise NoObjectToCreateException
+        date = datetime.datetime.strptime(date, "%d/%m/%Y")
+        return date
+
+class DateTransmissionEventIdMapper(Mapper):
+    def mapId(self, line):
+        return 'transmis-decision'
 
 
 #
@@ -823,72 +964,172 @@ class DecisionEventTypeMapper(Mapper):
 
 class DecisionEventIdMapper(Mapper):
     def mapId(self, line):
-        return 'decision-event'
+        return 'decision_event'
 
 
 class DecisionEventDateMapper(Mapper):
     def mapDecisiondate(self, line):
-        datePermis = self.getData('Date Permis')
-        dateRefus = self.getData('Date Refus')
-        datePermisRecours = self.getData('Date Permis sur recours')
-        dateRefusRecours = self.getData('Date Refus sur recours')
-        date = get_date_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
-        if not date:
-            self.logError(self, line, 'No decision date found')
-            raise NoObjectToCreateException
-        return date
+        licence = self.importer.current_containers_stack[-1]
+        if licence.portal_type in ['BuildLicence', 'ParcelOutLicence', 'EnvClassOne', 'EnvClassTwo']:
+            datePermis = self.getData('Date Permis')
+            dateRefus = self.getData('Date Refus')
+            datePermisRecours = self.getData('Date Permis sur recours')
+            dateRefusRecours = self.getData('Date Refus sur recours')
+            date = get_date_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
+            if not date:
+                self.logError(self, line, 'No decision date found')
+                raise NoObjectToCreateException
+        elif licence.portal_type == 'Declaration':
+            date = self.getData('DURDateDecision')
+
+            if not date:
+                date = self.getData('DURDateTransmission')
+                if not date:
+                    decision = self.getData('DURDecision')
+                    if decision:
+                        date = self.getValueMapping('default_date_decision')
+        elif licence.portal_type == 'UrbanCertificateTwo':
+            date = self.getData('CU2DateDecision')
+
+        return datetime.datetime.strptime(date, "%d/%m/%Y")
 
 
 class DecisionEventDecisionMapper(Mapper):
     def mapDecision(self, line):
-        datePermis = self.getData('Date Permis')
-        dateRefus = self.getData('Date Refus')
-        datePermisRecours = self.getData('Date Permis sur recours')
-        dateRefusRecours = self.getData('Date Refus sur recours')
-        state = get_state_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
-
-        if state == 'accept':
-            return u'Favorable'
-        elif state == 'refuse':
-            return u'Défavorable'
-
-
-
-class DecisionEventTitleMapper(Mapper):
-    def mapTitle(self, line):
-        tutAutorisa = self.getData('TutAutorisa')
-        tutRefus = self.getData('TutRefus')
-
-        if tutAutorisa or tutRefus:
-            return u'Délivrance du permis par la tutelle (octroi ou refus)'
-
         licence = self.importer.current_containers_stack[-1]
-        urban_tool = api.portal.get_tool('portal_urban')
-        eventtype_id = self.getValueMapping('eventtype_id_map')[licence.portal_type]['decision_event']
-        config = urban_tool.getUrbanConfig(licence)
-        event_type = getattr(config.urbaneventtypes, eventtype_id)
-        return event_type.Title()
+        if licence.portal_type in ['BuildLicence', 'ParcelOutLicence', 'EnvClassOne', 'EnvClassTwo']:
+            datePermis = self.getData('Date Permis')
+            dateRefus = self.getData('Date Refus')
+            datePermisRecours = self.getData('Date Permis sur recours')
+            dateRefusRecours = self.getData('Date Refus sur recours')
+            state = get_state_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
+
+            if state == 'accept':
+                return u'Favorable'
+            elif state == 'refuse':
+                return u'Défavorable'
+
+        elif licence.portal_type == 'Declaration':
+            return self.getData('DURDecision')
+        elif licence.portal_type == 'UrbanCertificateTwo':
+            return self.getData('CU2Decision')
 
 
 class DecisionEventNotificationDateMapper(Mapper):
     def mapEventdate(self, line):
-        datePermis = self.getData('Date Permis')
-        dateRefus = self.getData('Date Refus')
-        datePermisRecours = self.getData('Date Permis sur recours')
-        dateRefusRecours = self.getData('Date Refus sur recours')
-        eventDate = get_date_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
+        licence = self.importer.current_containers_stack[-1]
+        if licence.portal_type in ['BuildLicence', 'ParcelOutLicence', 'EnvClassOne', 'EnvClassTwo']:
+            datePermis = self.getData('Date Permis')
+            dateRefus = self.getData('Date Refus')
+            datePermisRecours = self.getData('Date Permis sur recours')
+            dateRefusRecours = self.getData('Date Refus sur recours')
+            eventDate = get_date_from_licences_dates(datePermis, dateRefus, datePermisRecours, dateRefusRecours)
+        elif licence.portal_type == 'Declaration':
+            eventDate = self.getData('DURDateDecision')
+            if not eventDate:
+                eventDate = self.getData('DURDateTransmission')
+                decision = self.getData('DURDecision')
+                if decision and not eventDate:
+                    eventDate = self.getValueMapping('default_date_decision')
+        elif licence.portal_type == 'UrbanCertificateTwo':
+            eventDate = self.getData('CU2DateDecision')
+
         if eventDate:
-            return eventDate
+            return datetime.datetime.strptime(eventDate, "%d/%m/%Y")
         else:
             raise NoObjectToCreateException
 
 
+class EnvClassThreeCondAcceptabilityEventIdMapper(Mapper):
+    def mapId(self, line):
+        return 'acceptation-de-la-demande-cond'
+
+
+class EnvClassThreeCondAcceptabilityEventMapper(Mapper):
+    def mapEventtype(self, line):
+        licence = self.importer.current_containers_stack[-1]
+        urban_tool = api.portal.get_tool('portal_urban')
+        eventtype_id = 'acceptation-de-la-demande-cond'
+        config = urban_tool.getUrbanConfig(licence)
+        if hasattr(config.urbaneventtypes, eventtype_id):
+            return getattr(config.urbaneventtypes, eventtype_id).UID()
+
+
+class EventDateEnvClassThreeCondAcceptabilityMapper(Mapper):
+    def mapEventdate(self, line):
+        eventDate = self.getData('DENDatePriseActeAvecConditions')
+        eventDecision = self.getData('DENDecision')
+        if eventDecision == "OK avec conditions":
+            if not eventDate:
+                eventDate = self.getValueMapping('default_date_decision')
+            return datetime.datetime.strptime(eventDate, "%d/%m/%Y")
+        else:
+            raise NoObjectToCreateException
+        return eventDate
+
+
+class EnvClassThreeAcceptabilityEventIdMapper(Mapper):
+    def mapId(self, line):
+        return 'acceptation-de-la-demande'
+
+
+class EnvClassThreeAcceptabilityEventMapper(Mapper):
+    def mapEventtype(self, line):
+        licence = self.importer.current_containers_stack[-1]
+        urban_tool = api.portal.get_tool('portal_urban')
+        eventtype_id = 'acceptation-de-la-demande'
+        config = urban_tool.getUrbanConfig(licence)
+        if hasattr(config.urbaneventtypes, eventtype_id):
+            return getattr(config.urbaneventtypes, eventtype_id).UID()
+
+
+class EventDateEnvClassThreeAcceptabilityMapper(Mapper):
+    def mapEventdate(self, line):
+        eventDate = self.getData('DENDatePriseActeSansConditions')
+        eventDecision = self.getData('DENDecision')
+        if eventDecision == "OK sans conditions":
+            if not eventDate:
+                eventDate = self.getValueMapping('default_date_decision')
+            return datetime.datetime.strptime(eventDate, "%d/%m/%Y")
+        else:
+            raise NoObjectToCreateException
+        return eventDate
+
+
+class EnvClassThreeUnacceptabilityEventIdMapper(Mapper):
+    def mapId(self, line):
+        return 'acceptation-de-la-demande'
+
+
+class EnvClassThreeUnacceptabilityEventMapper(Mapper):
+    def mapEventtype(self, line):
+        licence = self.importer.current_containers_stack[-1]
+        urban_tool = api.portal.get_tool('portal_urban')
+        eventtype_id = 'refus-de-la-demande'
+        config = urban_tool.getUrbanConfig(licence)
+        if hasattr(config.urbaneventtypes, eventtype_id):
+            return getattr(config.urbaneventtypes, eventtype_id).UID()
+
+
+class EventDateEnvClassThreeUnacceptabilityMapper(Mapper):
+    def mapEventdate(self, line):
+        eventDate = self.getData('DENDateIrrecevable')
+        eventDecision = self.getData('DENDecision')
+        if eventDecision == "irrecevable":
+            if not eventDate:
+                eventDate = self.getValueMapping('default_date_decision')
+            return datetime.datetime.strptime(eventDate, "%d/%m/%Y")
+        else:
+            raise NoObjectToCreateException
+        return eventDate
+
+
 class OldDecisionEventDateMapper(Mapper):
     def mapDecisiondate(self, line):
-        datePermis = self.getData('Date Permis')
+        datePermis = self.getData('DENDatePriseActeAvecConditions')
         try:
             d = datetime.datetime.strptime(datePermis, "%d.%m.%y")
-            if d > datetime.now():
+            if d > datetime.datetime.now():
                 d = datetime(d.year - 100, d.month, d.day)
             return d
         except ValueError:
@@ -910,7 +1151,7 @@ class OldDecisionEventNotificationDateMapper(Mapper):
         datePermis = self.getData('Date Permis')
         try:
             d = datetime.datetime.strptime(datePermis, "%d.%m.%y")
-            if d > datetime.now():
+            if d > datetime.datetime.now():
                 d = datetime(d.year - 100, d.month, d.day)
             return d
         except ValueError:
@@ -939,6 +1180,63 @@ class CollegeReportEventDateMapper(Mapper):
         else:
             raise NoObjectToCreateException
 
+
+class CompleteFolderEventMapper(Mapper):
+    def mapEventtype(self, line):
+        licence = self.importer.current_containers_stack[-1]
+        urban_tool = api.portal.get_tool('portal_urban')
+        eventtype_id = self.getValueMapping('eventtype_id_map')[licence.portal_type]['complete_folder']
+        config = urban_tool.getUrbanConfig(licence)
+        if hasattr(config.urbaneventtypes, eventtype_id):
+            return getattr(config.urbaneventtypes, eventtype_id).UID()
+
+class CompleteFolderDateMapper(Mapper):
+    def mapEventdate(self, line):
+        date = self.getData('PENDtDossierComplet')
+        if not date:
+            raise NoObjectToCreateException
+
+        try:
+            d = datetime.datetime.strptime(date, "%d/%m/%Y")
+            if d > datetime.datetime.now():
+                d = datetime(d.year - 100, d.month, d.day)
+            return d
+        except ValueError:
+            raise NoObjectToCreateException
+
+
+class CompleteFolderEventIdMapper(Mapper):
+    def mapId(self, line):
+        return 'complete_folder'
+
+
+class IncompleteFolderEventMapper(Mapper):
+    def mapEventtype(self, line):
+        licence = self.importer.current_containers_stack[-1]
+        urban_tool = api.portal.get_tool('portal_urban')
+        eventtype_id = ('dossier-incomplet')
+        config = urban_tool.getUrbanConfig(licence)
+        if hasattr(config.urbaneventtypes, eventtype_id):
+            return getattr(config.urbaneventtypes, eventtype_id).UID()
+
+
+class IncompleteFolderDateMapper(Mapper):
+    def mapEventdate(self, line):
+        date = self.getData('PENDtDossierIncomplet')
+        if not date:
+            raise NoObjectToCreateException
+        try:
+            d = datetime.datetime.strptime(date, "%d/%m/%Y")
+            if d > datetime.datetime.now():
+                d = datetime(d.year - 100, d.month, d.day)
+            return d
+        except ValueError:
+            raise NoObjectToCreateException
+
+
+class IncompleteFolderEventIdMapper(Mapper):
+    def mapId(self, line):
+        return 'incomplete_folder'
 
 
 #
@@ -1001,3 +1299,19 @@ class Utils():
             if not (new_id in containerArchitects.objectIds()):
                     object_id = containerArchitects.invokeFactory('Architect', id=new_id,
                                                         name1=new_name1)
+
+    @staticmethod
+    def createGeometrician(name1, name2):
+
+        idGeometrician = idnormalizer.normalize(name1 + name2 + 'Geometrician').replace(" ", "")
+        containerGeometricians = api.content.get(path='/urban/geometricians')
+
+        if idGeometrician not in containerGeometricians.objectIds():
+            new_id = idGeometrician
+            new_name1 = name1
+            new_name2 = name2
+
+            if not (new_id in containerGeometricians.objectIds()):
+                    object_id = containerGeometricians.invokeFactory('Geometrician', id=new_id,
+                                                        name1=new_name1,
+                                                        name2=new_name2)

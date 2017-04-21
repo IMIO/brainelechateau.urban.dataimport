@@ -6,19 +6,30 @@ VALUES_MAPS = {
 
     'type_map': {
         'PUR': 'BuildLicence',
+        'MPL': 'ParcelOutLicence',  # lotissement modifié
+        'PLO': 'ParcelOutLicence',
+        'DUR': 'Declaration',
+        'CU2': 'UrbanCertificateTwo',
+        'DEN': 'EnvClassThree',
+        'PE2': 'EnvClassTwo',
+        'PX2': 'EnvClassTwo',
+        'PE1': 'EnvClassOne',
+        'PX1': 'EnvClassOne',
+        'PU1': 'BuildLicence',
+        'PU2': 'BuildLicence',
     },
 
     'eventtype_id_map': table({
-        'header'             : ['decision_event', 'college_report_event', 'deposit_event'],
-        'BuildLicence'       : ['delivrance-du-permis-octroi-ou-refus', 'rapport-du-college', 'depot-de-la-demande'],
-        'ParcelOutLicence'   : ['delivrance-du-permis-octroi-ou-refus', 'rapport-du-college', 'depot-de-la-demande'],
-        'Declaration'        : ['deliberation-college', 'rapport-du-college', 'depot-de-la-demande'],
-        'UrbanCertificateOne': ['octroi-cu1', 'rapport-du-college', 'depot-de-la-demande'],
-        'UrbanCertificateTwo': ['octroi-cu2', 'rapport-du-college', 'depot-de-la-demande'],
-        'MiscDemand'         : ['deliberation-college', 'rapport-du-college', 'depot-de-la-demande'],
-        'EnvClassOne'        : ['decision', 'rapport-du-college', 'depot-de-la-demande'],
-        'EnvClassTwo'        : ['desision', 'rapport-du-college', 'depot-de-la-demande'],
-        'EnvClassThree'      : ['acceptation-de-la-demande', 'rapport-du-college', 'depot-de-la-demande'],
+        'header'             : ['decision_event', 'college_report_event', 'deposit_event', 'complete_folder'],
+        'BuildLicence'       : ['delivrance-du-permis-octroi-ou-refus', 'rapport-du-college', 'depot-de-la-demande','accuse-de-reception'],
+        'ParcelOutLicence'   : ['delivrance-du-permis-octroi-ou-refus', 'rapport-du-college', 'depot-de-la-demande','accuse-de-reception'],
+        'Declaration'        : ['deliberation-college', 'rapport-du-college', 'depot-de-la-demande',''],
+        'UrbanCertificateOne': ['octroi-cu1', 'rapport-du-college', 'depot-de-la-demande', ''],
+        'UrbanCertificateTwo': ['octroi-cu2', 'rapport-du-college', 'depot-de-la-demande', ''],
+        'MiscDemand'         : ['deliberation-college', 'rapport-du-college', 'depot-de-la-demande',''],
+        'EnvClassOne'        : ['decision', 'rapport-du-college', 'depot-de-la-demande', 'dossier-complet-recevable'],
+        'EnvClassTwo'        : ['decision', 'rapport-du-college', 'depot-de-la-demande', 'dossier-complet-recevable'],
+        'EnvClassThree'      : ['acceptation-de-la-demande', 'rapport-du-college', 'depot-de-la-demande',''],
     }),
 
     'solicitOpinionDictionary': {
@@ -38,6 +49,7 @@ VALUES_MAPS = {
                '14':        "voo", #Avis VOO
                '15':        "bec", #Avis Service technique communal
                '16':        "ccatm", #Avis CCATM
+               '17':        "owd", #Avis OWD
             },
 
     'zoneDictionary': {
@@ -63,4 +75,5 @@ VALUES_MAPS = {
            "zone non affectée"                                                     : 'zone-non-affectee'                            ,
     },
 
+    'default_date_decision': '09/09/2099',
 }
