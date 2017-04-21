@@ -322,7 +322,7 @@ FIELDS_MAPPINGS = {
     'COLLEGE REPORT EVENT':
     {
         'factory': [UrbanEventFactory],
-        'allowed_containers': ['BuildLicence', 'ParcelOutLicence', 'EnvClassThree'],
+        'allowed_containers': ['BuildLicence', 'ParcelOutLicence'],
 
         'mappers': {
             CollegeReportTypeMapper: {
